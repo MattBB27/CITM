@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+{% if not rev_by_branch %}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:48px">
+    <div style="font-size:32px;margin-bottom:12px">▦</div>
+    <div style="font-family:var(--font-head);font-size:18px;margin-bottom:8px">No Warehouse Data</div>
+    <p class="text-muted" style="margin-bottom:20px">Run the ETL pipeline to load data into the warehouse.</p>
+    <a href="{{ url_for('etl') }}" class="btn btn-primary">⟳ &nbsp; Go to ETL Pipeline</a>
+  </div>
+</div>
+{% else %}
+
+<!-- Revenue by Branch -->
+<div class="card mb-6">
+  <div class="card-header">Revenue by Branch</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Branch</th><th>City</th><th>Total Loans</th><th>Total Revenue</th><th>Avg Fee</th></tr>
+      </thead>
+      <tbody>
+        {% for row in rev_by_branch %}
+        <tr>
+          <td>{{ row[0] }}</td>
+          <td class="text-muted">{{ row[1] }}</td>
+          <td class="mono">{{ row[2] }}</td>
+          <td class="text-success mono">${{ "%.2f"|format(row[3]) }}</td>
+          <td class="mono">${{ "%.2f"|format(row[4]) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid-2 mb-6">
+  <!-- Vehicle Type Usage -->
+  <div class="card">
+    <div class="card-header">Vehicle Type Performance</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Rentals</th><th>Avg Days</th><th>Revenue</th></tr>
+        </thead>
+        <tbody>
+          {% for row in vtype_usage %}
+          <tr>
+            <td>
+              <span class="badge badge-blue">{{ row[0] }}</span>
+            </td>
+            <td class="mono">{{ row[1] }}</td>
+            <td class="mono">{{ row[2] }}</td>
+            <td class="text-success mono">${{ "%.0f"|format(row[4]) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Top Customers -->
+  <div class="card">
+    <div class="card-header">Top Customers by Spend</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>#</th><th>Customer</th><th>Rentals</th><th>Total Spent</th></tr>
+        </thead>
+        <tbody>
+          {% for row in top_customers %}
+          <tr>
+            <td class="mono text-muted">{{ loop.index }}</td>
+            <td>{{ row[0] }}</td>
+            <td class="mono">{{ row[2] }}</td>
+            <td class="text-success mono">${{ "%.2f"|format(row[3]) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Revenue by Month -->
+<div class="card mb-6">
+  <div class="card-header">Monthly Revenue Trend</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Month</th><th>Year</th><th>Loans</th><th>Revenue</th><th>Bar</th></tr>
+      </thead>
+      <tbody>
+        {% set max_rev = rev_by_month | map(attribute=4) | max %}
+        {% for row in rev_by_month %}
+        <tr>
+          <td>{{ row[2] }}</td>
+          <td class="mono">{{ row[0] }}</td>
+          <td class="mono">{{ row[3] }}</td>
+          <td class="text-success mono">${{ "%.0f"|format(row[4]) }}</td>
+          <td style="width:200px">
+            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div style="height:100%;width:{{ (row[4]/max_rev*100)|int }}%;background:var(--accent);border-radius:3px"></div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endif %}
+{% endblock %}

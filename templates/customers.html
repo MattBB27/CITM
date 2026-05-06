@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('customer_new') }}" class="btn btn-primary btn-sm">+ Register Customer</a>
+{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    Customer Registry
+    <span class="badge badge-blue">{{ customers|length }} records</span>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Customer ID</th>
+          <th>Full Name</th>
+          <th>Driver Licence</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td class="mono text-accent">{{ c.customer_id }}</td>
+          <td>{{ c.name }}</td>
+          <td class="mono" style="font-size:11px">{{ c.driver_license_number }}</td>
+          <td class="text-muted" style="font-size:12px">{{ c.email or '—' }}</td>
+          <td class="mono" style="font-size:11px">{{ c.phone or '—' }}</td>
+          <td>
+            <a href="{{ url_for('customer_edit', cid=c.customer_id) }}" class="btn btn-outline btn-sm">Edit</a>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-muted" style="padding:24px;text-align:center">No customers found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

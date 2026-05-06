@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Branches{% endblock %}
+{% block page_title %}Branches{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-header">Branch Locations</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Branch ID</th><th>Branch Name</th><th>City</th><th>State</th></tr>
+      </thead>
+      <tbody>
+        {% for b in branches %}
+        <tr>
+          <td class="mono text-accent">{{ b.branch_id }}</td>
+          <td>{{ b.branch_name }}</td>
+          <td>{{ b.city }}</td>
+          <td class="badge badge-muted">{{ b.state }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="text-muted" style="padding:24px;text-align:center">No branches.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}ETL Pipeline{% endblock %}
+{% block page_title %}ETL Pipeline{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="margin-bottom:20px">
+  <!-- Run Panel -->
+  <div class="card">
+    <div class="card-header">Pipeline Control</div>
+    <div class="card-body">
+      <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.7">
+        Runs the full <strong style="color:var(--text)">Extract → Transform → Load</strong> sequence
+        against the operational database and loads results into the data warehouse star schema.
+        Incremental load — only new records are inserted.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+        <div class="flex gap-2" style="font-size:12px">
+          <span class="badge badge-blue">EXTRACT</span>
+          <span class="text-muted">SQLAlchemy → pandas DataFrames</span>
+        </div>
+        <div style="padding-left:14px;color:var(--muted);font-size:11px">↓</div>
+        <div class="flex gap-2" style="font-size:12px">
+          <span class="badge badge-orange">TRANSFORM</span>
+          <span class="text-muted">Type coercion · dedup · key generation</span>
+        </div>
+        <div style="padding-left:14px;color:var(--muted);font-size:11px">↓</div>
+        <div class="flex gap-2" style="font-size:12px">
+          <span class="badge badge-green">LOAD</span>
+          <span class="text-muted">Upsert dims · append facts</span>
+        </div>
+      </div>
+      <form method="POST" action="{{ url_for('etl_run') }}">
+        <button type="submit" class="btn btn-primary w-full" style="justify-content:center;padding:10px">
+          ⟳ &nbsp; Execute ETL Pipeline
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Warehouse Stats -->
+  <div class="card">
+    <div class="card-header">Warehouse State</div>
+    <div class="card-body">
+      <table style="width:100%">
+        <thead>
+          <tr>
+            <th>Table</th>
+            <th>Type</th>
+            <th style="text-align:right">Rows</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="mono text-accent">fact_loan_transaction</td>
+            <td><span class="badge badge-orange">FACT</span></td>
+            <td style="text-align:right;font-family:var(--font-mono)">{{ wh_stats.fact_rows }}</td>
+          </tr>
+          <tr>
+            <td class="mono text-muted">dim_customer</td>
+            <td><span class="badge badge-blue">DIM</span></td>
+            <td style="text-align:right;font-family:var(--font-mono)">{{ wh_stats.dim_customer }}</td>
+          </tr>
+          <tr>
+            <td class="mono text-muted">dim_vehicle</td>
+            <td><span class="badge badge-blue">DIM</span></td>
+            <td style="text-align:right;font-family:var(--font-mono)">{{ wh_stats.dim_vehicle }}</td>
+          </tr>
+          <tr>
+            <td class="mono text-muted">dim_branch</td>
+            <td><span class="badge badge-blue">DIM</span></td>
+            <td style="text-align:right;font-family:var(--font-mono)">{{ wh_stats.dim_branch }}</td>
+          </tr>
+          <tr>
+            <td class="mono text-muted">dim_date</td>
+            <td><span class="badge badge-blue">DIM</span></td>
+            <td style="text-align:right;font-family:var(--font-mono)">{{ wh_stats.dim_date }}</td>
+          </tr>
+        </tbody>
+      </table>
+      {% if wh_stats.fact_rows > 0 %}
+      <div style="margin-top:12px">
+        <a href="{{ url_for('analytics') }}" class="btn btn-outline w-full" style="justify-content:center">
+          ▦ &nbsp; View Analytics
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<!-- ETL Run History -->
+<div class="card">
+  <div class="card-header">Run History (Session)</div>
+  {% if history %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Started</th>
+          <th>Status</th>
+          <th>Duration</th>
+          <th>Extract</th>
+          <th>Facts Loaded</th>
+          <th>Dims Loaded</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in history|reverse %}
+        <tr>
+          <td class="mono" style="font-size:11px">{{ run.started_at }}</td>
+          <td>
+            {% if run.status == 'success' %}
+              <span class="badge badge-green">SUCCESS</span>
+            {% else %}
+              <span class="badge badge-red">FAILED</span>
+            {% endif %}
+          </td>
+          <td class="mono">{{ run.total_duration_s }}s</td>
+          <td class="mono" style="font-size:11px">
+            {% if run.steps.extract is defined %}
+              {{ run.steps.extract.records_extracted.loans }} loans
+            {% endif %}
+          </td>
+          <td class="mono">
+            {% if run.steps.load_facts is defined %}
+              {{ run.steps.load_facts.records_inserted }}
+            {% endif %}
+          </td>
+          <td class="mono" style="font-size:11px">
+            {% if run.steps.load_dimensions is defined %}
+              C:{{ run.steps.load_dimensions.dim_customer }}
+              V:{{ run.steps.load_dimensions.dim_vehicle }}
+              B:{{ run.steps.load_dimensions.dim_branch }}
+              D:{{ run.steps.load_dimensions.dim_date }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted" style="text-align:center;padding:32px">
+    No ETL runs in this session. Execute the pipeline above.
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

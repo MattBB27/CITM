@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Record Loan{% endblock %}
+{% block page_title %}Record Loan{% endblock %}
+{% block content %}
+<div style="max-width:600px">
+  <div class="card">
+    <div class="card-header">Record Loan Transaction</div>
+    <div class="card-body">
+      <form method="POST">
+        <div class="form-group">
+          <label class="form-label">Customer *</label>
+          <select name="customer_id" class="form-control" required>
+            <option value="">— Select Customer —</option>
+            {% for c in customers %}
+              <option value="{{ c.customer_id }}">{{ c.name }} ({{ c.customer_id }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Vehicle *</label>
+            <select name="vehicle_id" class="form-control" required>
+              <option value="">— Select Vehicle —</option>
+              {% for v in vehicles %}
+                <option value="{{ v.vehicle_id }}">{{ v.manufacturer }} {{ v.model }} ({{ v.vehicle_type }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Branch *</label>
+            <select name="branch_id" class="form-control" required>
+              <option value="">— Select Branch —</option>
+              {% for b in branches %}
+                <option value="{{ b.branch_id }}">{{ b.branch_name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Loan Date *</label>
+            <input name="loan_date" type="date" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Return Date *</label>
+            <input name="return_date" type="date" class="form-control" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Loan Fee ($) — leave blank for auto-calculation</label>
+          <input name="loan_fee" type="number" step="0.01" class="form-control" placeholder="Auto">
+        </div>
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary">Record Transaction</button>
+          <a href="{{ url_for('loans') }}" class="btn btn-outline">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

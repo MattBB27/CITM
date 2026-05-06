@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block topbar_actions %}
+  <a href="{{ url_for('loan_new') }}" class="btn btn-primary btn-sm">+ New Loan</a>
+{% endblock %}
+
+{% block content %}
+<div class="kpi-grid">
+  <div class="kpi">
+    <div class="kpi-label">Customers</div>
+    <div class="kpi-value">{{ kpis.total_customers }}</div>
+    <div class="kpi-sub">Registered</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Vehicles</div>
+    <div class="kpi-value">{{ kpis.total_vehicles }}</div>
+    <div class="kpi-sub">{{ kpis.available_vehicles }} available</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Loan Transactions</div>
+    <div class="kpi-value">{{ kpis.total_loans }}</div>
+    <div class="kpi-sub">Total recorded</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Branches</div>
+    <div class="kpi-value">{{ kpis.total_branches }}</div>
+    <div class="kpi-sub">Active locations</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Total Revenue</div>
+    <div class="kpi-value" style="font-size:22px">${{ "%.0f"|format(kpis.total_revenue) }}</div>
+    <div class="kpi-sub">Operational DB</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Warehouse Facts</div>
+    <div class="kpi-value">{{ kpis.wh_fact_rows }}</div>
+    <div class="kpi-sub">Fact rows loaded</div>
+  </div>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      Recent Loan Transactions
+      <a href="{{ url_for('loans') }}" class="btn btn-outline btn-sm">View All</a>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Loan ID</th>
+            <th>Customer</th>
+            <th>Vehicle</th>
+            <th>Date</th>
+            <th>Fee</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for loan in recent %}
+          <tr>
+            <td class="mono text-accent">{{ loan.loan_id }}</td>
+            <td>{{ loan.customer.name if loan.customer else loan.customer_id }}</td>
+            <td>{{ loan.vehicle.manufacturer ~ ' ' ~ loan.vehicle.model if loan.vehicle else loan.vehicle_id }}</td>
+            <td class="mono" style="font-size:11px">{{ loan.loan_date }}</td>
+            <td class="text-success">${{ "%.2f"|format(loan.loan_fee) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="text-muted" style="padding:20px;text-align:center">No loan transactions yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">System Status</div>
+    <div class="card-body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span class="mono" style="font-size:11px">OPERATIONAL DB</span>
+          <span class="badge badge-green">ONLINE</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span class="mono" style="font-size:11px">DATA WAREHOUSE</span>
+          <span class="badge {% if kpis.wh_fact_rows > 0 %}badge-green{% else %}badge-orange{% endif %}">
+            {% if kpis.wh_fact_rows > 0 %}LOADED{% else %}EMPTY{% endif %}
+          </span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border)">
+          <span class="mono" style="font-size:11px">ETL PIPELINE</span>
+          <span class="badge badge-blue">READY</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0">
+          <span class="mono" style="font-size:11px">STAR SCHEMA</span>
+          <span class="badge badge-green">ACTIVE</span>
+        </div>
+      </div>
+      <div style="margin-top:16px">
+        <a href="{{ url_for('etl') }}" class="btn btn-primary w-full" style="justify-content:center">
+          ⟳ &nbsp;Run ETL Pipeline
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

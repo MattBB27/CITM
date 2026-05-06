@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}Loan Transactions{% endblock %}
+{% block page_title %}Loan Transactions{% endblock %}
+{% block topbar_actions %}
+  <a href="{{ url_for('loan_new') }}" class="btn btn-primary btn-sm">+ New Loan</a>
+{% endblock %}
+{% block content %}
+<div class="flex gap-2 mb-4 justify-between">
+  <form method="GET" class="flex gap-2">
+    <input name="search" class="form-control" style="width:240px" placeholder="Search ID, customer, vehicle..."
+           value="{{ search }}">
+    <button type="submit" class="btn btn-outline">Search</button>
+  </form>
+  <span class="text-muted" style="font-size:12px;align-self:center">{{ total }} total records</span>
+</div>
+
+<div class="card">
+  <div class="card-header">Loan Transactions</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Loan ID</th>
+          <th>Customer</th>
+          <th>Vehicle</th>
+          <th>Branch</th>
+          <th>Loan Date</th>
+          <th>Return Date</th>
+          <th>Days</th>
+          <th>Fee</th>
+          <th>Distance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in loans %}
+        {% set days = (l.return_date - l.loan_date).days %}
+        {% set dist = l.ending_mileage - l.starting_mileage %}
+        <tr>
+          <td class="mono text-accent">{{ l.loan_id }}</td>
+          <td>{{ l.customer.name if l.customer else l.customer_id }}</td>
+          <td>{{ (l.vehicle.manufacturer ~ ' ' ~ l.vehicle.model) if l.vehicle else l.vehicle_id }}</td>
+          <td class="text-muted" style="font-size:12px">{{ l.branch.city if l.branch else l.branch_id }}</td>
+          <td class="mono" style="font-size:11px">{{ l.loan_date }}</td>
+          <td class="mono" style="font-size:11px">{{ l.return_date }}</td>
+          <td class="mono">{{ days }}</td>
+          <td class="text-success mono">${{ "%.2f"|format(l.loan_fee) }}</td>
+          <td class="mono">{{ "{:,}".format(dist) }} km</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="9" class="text-muted" style="padding:24px;text-align:center">No records found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if pages > 1 %}
+<div class="flex gap-2" style="margin-top:14px;justify-content:center">
+  {% for p in range(1, pages+1) %}
+    {% if p == page %}
+      <span class="btn btn-primary btn-sm">{{ p }}</span>
+    {% else %}
+      <a href="{{ url_for('loans', page=p, search=search) }}" class="btn btn-outline btn-sm">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
