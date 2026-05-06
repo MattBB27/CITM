@@ -1,0 +1,63 @@
+citm-db SQL db delete
+IF OBJECT_ID('loan_transactions') IS NOT NULL DROP TABLE loan_transactions;
+IF OBJECT_ID('customers') IS NOT NULL DROP TABLE customers;
+IF OBJECT_ID('vehicles') IS NOT NULL DROP TABLE vehicles;
+IF OBJECT_ID('branches') IS NOT NULL DROP TABLE branches;
+
+azure synapse build
+CREATE TABLE dim_customer (
+    customer_key INT NOT NULL IDENTITY(1,1),
+    customer_id VARCHAR(50) NOT NULL,
+    name VARCHAR(100) NULL,
+    driver_license_number VARCHAR(50) NULL
+) WITH (DISTRIBUTION = ROUND_ROBIN);
+
+CREATE TABLE dim_vehicle (
+    vehicle_key INT NOT NULL IDENTITY(1,1),
+    vehicle_id VARCHAR(50) NOT NULL,
+    model VARCHAR(100) NULL,
+    manufacturer VARCHAR(100) NULL,
+    vehicle_type VARCHAR(50) NULL
+) WITH (DISTRIBUTION = ROUND_ROBIN);
+
+CREATE TABLE dim_branch (
+    branch_key INT NOT NULL IDENTITY(1,1),
+    branch_id VARCHAR(50) NOT NULL,
+    branch_name VARCHAR(100) NULL,
+    city VARCHAR(50) NULL,
+    state VARCHAR(50) NULL
+) WITH (DISTRIBUTION = ROUND_ROBIN);
+
+CREATE TABLE dim_date (
+    date_key INT NOT NULL,
+    full_date DATE NOT NULL,
+    day INT NULL,
+    month INT NULL,
+    year INT NULL,
+    quarter INT NULL,
+    day_of_week VARCHAR(20) NULL,
+    month_name VARCHAR(20) NULL
+) WITH (DISTRIBUTION = ROUND_ROBIN);
+
+CREATE TABLE fact_loan_transaction (
+    loan_fact_key INT NOT NULL IDENTITY(1,1),
+    customer_key INT NULL,
+    vehicle_key INT NULL,
+    loan_date_key INT NULL,
+    return_date_key INT NULL,
+    branch_key INT NULL,
+    source_loan_id VARCHAR(50) NULL,
+    loan_fee DECIMAL(10,2) NULL,
+    loan_duration_days INT NULL,
+    distance_driven INT NULL,
+    starting_mileage INT NULL,
+    ending_mileage INT NULL
+) WITH (DISTRIBUTION = ROUND_ROBIN);
+
+AZURE SYNAPSE delete
+IF OBJECT_ID('fact_loan_transaction') IS NOT NULL DROP TABLE fact_loan_transaction;
+IF OBJECT_ID('dim_customer') IS NOT NULL DROP TABLE dim_customer;
+IF OBJECT_ID('dim_vehicle') IS NOT NULL DROP TABLE dim_vehicle;
+IF OBJECT_ID('dim_branch') IS NOT NULL DROP TABLE dim_branch;
+IF OBJECT_ID('dim_date') IS NOT NULL DROP TABLE dim_date;
+
