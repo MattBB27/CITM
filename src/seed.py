@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 # ── Sample Data ────────────────────────────────────────────────────────────────
 
 BRANCHES = [
-    ("BRN-001", "Sydney CBD Branch",       "Sydney",    "NSW"),
-    ("BRN-002", "Melbourne Central Branch","Melbourne", "VIC"),
-    ("BRN-003", "Brisbane City Branch",    "Brisbane",  "QLD"),
-    ("BRN-004", "Perth Metro Branch",      "Perth",     "WA"),
-    ("BRN-005", "Adelaide North Branch",   "Adelaide",  "SA"),
+    ("BRN-001", "Sydney Branch",       "Sydney",    "NSW"),
+    ("BRN-002", "Melbourne Branch","Melbourne", "VIC"),
+    ("BRN-003", "Brisbane Branch",    "Brisbane",  "QLD"),
+    ("BRN-004", "Perth Branch",      "Perth",     "WA"),
+    ("BRN-005", "Adelaide Branch",   "Adelaide",  "SA"),
 ]
 
 VEHICLES = [

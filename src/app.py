@@ -111,9 +111,17 @@ def create_app() -> Flask:
     def customer_new():
         if request.method == "POST":
             db = OpSession()
-            count = db.query(Customer).count()
+            max_num = 0
+            for c in db.query(Customer).all():
+                try:
+                    n = int(c.customer_id.split("-")[-1])
+                    if n > max_num: max_num = n
+                except (ValueError, IndexError):
+                    pass
+            new_id = f"CUST-{max_num+1:03d}"
+
             cust = Customer(
-                customer_id           = f"CUST-{count+1:03d}",
+                customer_id           = new_id,
                 name                  = request.form["name"],
                 driver_license_number = request.form["driver_license_number"],
                 email                 = request.form.get("email"),
@@ -121,7 +129,7 @@ def create_app() -> Flask:
             )
             db.add(cust)
             db.commit()
-            flash(f"Customer '{cust.name}' registered successfully.", "success")
+            flash(f"Customer '{cust.name}' registered as {new_id}.", "success")
             db.close()
             return redirect(url_for("customers"))
         return render_template("customer_form.html", action="Register", customer=None)
@@ -176,18 +184,28 @@ def create_app() -> Flask:
     def vehicle_new():
         if request.method == "POST":
             db = OpSession()
-            count = db.query(Vehicle).count()
+            # Use max existing numeric suffix + 1 to avoid collisions
+            existing_ids = [v.vehicle_id for v in db.query(Vehicle).all()]
+            max_num = 0
+            for vid in existing_ids:
+                try:
+                    n = int(vid.split("-")[-1])
+                    if n > max_num: max_num = n
+                except (ValueError, IndexError):
+                    pass
+            new_id = f"VEH-{max_num+1:03d}"
+
             veh = Vehicle(
-                vehicle_id   = f"VEH-{count+1:03d}",
+                vehicle_id   = new_id,
                 model        = request.form["model"],
                 manufacturer = request.form["manufacturer"],
                 vehicle_type = request.form["vehicle_type"],
-                mileage      = int(request.form.get("mileage", 0)),
+                mileage      = int(request.form.get("mileage") or 0),
                 is_available = True,
             )
             db.add(veh)
             db.commit()
-            flash(f"Vehicle '{veh.manufacturer} {veh.model}' added.", "success")
+            flash(f"Vehicle '{veh.manufacturer} {veh.model}' added as {new_id}.", "success")
             db.close()
             return redirect(url_for("vehicles"))
         return render_template("vehicle_form.html", vehicle=None)
@@ -232,17 +250,35 @@ def create_app() -> Flask:
     def loan_new():
         db = OpSession()
         if request.method == "POST":
-            count = db.query(LoanTransaction).count()
+            max_num = 0
+            for l in db.query(LoanTransaction).all():
+                try:
+                    n = int(l.loan_id.split("-")[-1])
+                    if n > max_num: max_num = n
+                except (ValueError, IndexError):
+                    pass
+            new_id = f"LOAN-{max_num+1:05d}"
+
             veh   = db.query(Vehicle).get(request.form["vehicle_id"])
             start_km = veh.mileage if veh else 0
             loan_date   = date.fromisoformat(request.form["loan_date"])
             return_date = date.fromisoformat(request.form["return_date"])
             days        = (return_date - loan_date).days or 1
-            fee         = round(float(request.form.get("loan_fee", days * 90)), 2)
-            end_km      = start_km + days * 120  # estimated
+
+            # Fee: use form value if present and non-empty, else auto-calc by vehicle type
+            fee_raw = request.form.get("loan_fee", "").strip()
+            if fee_raw:
+                fee = round(float(fee_raw), 2)
+            else:
+                # Auto-calc based on vehicle type daily rate
+                rates = {"Sedan": 85, "Hatchback": 75, "SUV": 110, "Ute": 130, "Van": 120}
+                daily = rates.get(veh.vehicle_type, 90) if veh else 90
+                fee = round(daily * days, 2)
+
+            end_km = start_km + days * 120  # estimated
 
             loan = LoanTransaction(
-                loan_id          = f"LOAN-{count+1:05d}",
+                loan_id          = new_id,
                 customer_id      = request.form["customer_id"],
                 vehicle_id       = request.form["vehicle_id"],
                 branch_id        = request.form["branch_id"],
