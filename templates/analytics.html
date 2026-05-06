@@ -23,6 +23,73 @@
 </div>
 {% else %}
 
+<!-- Headline KPIs from the warehouse -->
+<div class="kpi-grid mb-6">
+  <div class="kpi">
+    <div class="kpi-label">Total Revenue</div>
+    <div class="kpi-value" style="font-size:24px">${{ "{:,.0f}".format(headline.total_revenue or 0) }}</div>
+    <div class="kpi-sub">All time</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Total Rentals</div>
+    <div class="kpi-value">{{ headline.total_loans or 0 }}</div>
+    <div class="kpi-sub">Loan transactions</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Average Fee</div>
+    <div class="kpi-value" style="font-size:24px">${{ "{:,.0f}".format(headline.avg_fee or 0) }}</div>
+    <div class="kpi-sub">Per rental</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Avg Duration</div>
+    <div class="kpi-value">{{ headline.avg_days or 0 }}<span style="font-size:14px;color:var(--muted)"> days</span>
+    </div>
+    <div class="kpi-sub">Per rental</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Avg Distance</div>
+    <div class="kpi-value" style="font-size:24px">{{ "{:,.0f}".format(headline.avg_distance or 0) }}<span
+        style="font-size:14px;color:var(--muted)"> km</span></div>
+    <div class="kpi-sub">Per rental</div>
+  </div>
+</div>
+
+<!-- Annual Revenue -->
+<div class="card mb-6">
+  <div class="card-header">Annual Revenue</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Year</th>
+          <th>Total Rentals</th>
+          <th>Total Revenue</th>
+          <th>Avg Fee</th>
+          <th>Bar</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% set max_year_rev = (rev_by_year | map(attribute=2) | list | max) or 1 %}
+        {% for row in rev_by_year %}
+        <tr>
+          <td class="mono text-accent">{{ row[0] }}</td>
+          <td class="mono">{{ row[1] }}</td>
+          <td class="text-success mono">${{ "{:,.2f}".format(row[2]) }}</td>
+          <td class="mono">${{ "{:,.2f}".format(row[3]) }}</td>
+          <td style="width:200px">
+            <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+              <div
+                style="height:100%;width:{{ ((row[2] / max_year_rev) * 100)|int }}%;background:var(--accent);border-radius:3px">
+              </div>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <!-- Revenue by Branch -->
 <div class="card mb-6">
   <div class="card-header">Revenue by Branch</div>

@@ -423,6 +423,28 @@ def create_app() -> Flask:
         wdb = WhSession()
         try:
             data = {
+                # Headline KPIs across the entire warehouse
+                "headline": wdb.execute(text("""
+                    SELECT COUNT(loan_fact_key)                       AS total_loans,
+                           ROUND(CAST(SUM(loan_fee) AS FLOAT),2)        AS total_revenue,
+                           ROUND(CAST(AVG(loan_fee) AS FLOAT),2)        AS avg_fee,
+                           ROUND(CAST(AVG(loan_duration_days) AS FLOAT),1) AS avg_days,
+                           ROUND(CAST(AVG(distance_driven) AS FLOAT),0)    AS avg_distance
+                    FROM fact_loan_transaction
+                """)).fetchone(),
+
+                # Annual revenue breakdown
+                "rev_by_year": wdb.execute(text("""
+                    SELECT d.year,
+                           COUNT(f.loan_fact_key) AS loans,
+                           ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue,
+                           ROUND(CAST(AVG(f.loan_fee) AS FLOAT),2) AS avg_fee
+                    FROM fact_loan_transaction f
+                    JOIN dim_date d ON f.loan_date_key = d.date_key
+                    GROUP BY d.year
+                    ORDER BY d.year DESC
+                """)).fetchall(),
+
                 "rev_by_branch": wdb.execute(text("""
                     SELECT b.branch_name, b.city,
                            COUNT(f.loan_fact_key) AS total_loans,
