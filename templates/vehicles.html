@@ -2,7 +2,7 @@
 {% block title %}Vehicles{% endblock %}
 {% block page_title %}Vehicles{% endblock %}
 {% block topbar_actions %}
-  <a href="{{ url_for('vehicle_new') }}" class="btn btn-primary btn-sm">+ Add Vehicle</a>
+<a href="{{ url_for('vehicle_new') }}" class="btn btn-primary btn-sm">+ Add Vehicle</a>
 {% endblock %}
 {% block content %}
 <!-- Filters -->
@@ -11,7 +11,7 @@
     <select name="type" class="form-control" style="width:160px" onchange="this.form.submit()">
       <option value="">All Types</option>
       {% for t in types %}
-        <option value="{{ t }}" {% if t==sel_type %}selected{% endif %}>{{ t }}</option>
+      <option value="{{ t }}" {% if t==sel_type %}selected{% endif %}>{{ t }}</option>
       {% endfor %}
     </select>
     <select name="available" class="form-control" style="width:160px" onchange="this.form.submit()">
@@ -25,7 +25,7 @@
 <div class="card">
   <div class="card-header">
     Fleet Inventory
-    <span class="badge badge-blue">{{ vehicles|length }} shown</span>
+    <span class="badge badge-blue">{{ vehicle_rows|length }} shown</span>
   </div>
   <div class="table-wrap">
     <table>
@@ -37,11 +37,12 @@
           <th>Type</th>
           <th>Mileage (km)</th>
           <th>Status</th>
-          <th></th>
+          <th>Active Loan</th>
         </tr>
       </thead>
       <tbody>
-        {% for v in vehicles %}
+        {% for row in vehicle_rows %}
+        {% set v = row.vehicle %}
         <tr>
           <td class="mono text-accent">{{ v.vehicle_id }}</td>
           <td>{{ v.manufacturer }}</td>
@@ -49,25 +50,34 @@
           <td><span class="badge badge-muted">{{ v.vehicle_type }}</span></td>
           <td class="mono">{{ "{:,}".format(v.mileage) }}</td>
           <td>
-            {% if v.is_available %}
-              <span class="badge badge-green">Available</span>
+            {% if row.is_available %}
+            <span class="badge badge-green">Available</span>
             {% else %}
-              <span class="badge badge-red">On Loan</span>
+            <span class="badge badge-red">On Loan</span>
             {% endif %}
           </td>
-          <td>
-            <form method="POST" action="{{ url_for('vehicle_toggle', vid=v.vehicle_id) }}" style="display:inline">
-              <button type="submit" class="btn btn-outline btn-sm">
-                {% if v.is_available %}Mark On Loan{% else %}Mark Available{% endif %}
-              </button>
-            </form>
+          <td style="font-size:11px">
+            {% if row.active_loan %}
+            <span class="mono text-accent">{{ row.active_loan.loan_id }}</span><br>
+            <span class="text-muted">{{ row.active_loan.customer_name }} · returns {{ row.active_loan.return_date
+              }}</span>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-muted" style="padding:24px;text-align:center">No vehicles found.</td></tr>
+        <tr>
+          <td colspan="7" class="text-muted" style="padding:24px;text-align:center">No vehicles found.</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+</div>
+
+<div class="text-muted" style="font-size:11px;margin-top:10px">
+  ℹ Availability is computed automatically from active loans (loans where today's date falls between loan and return
+  date).
 </div>
 {% endblock %}

@@ -59,12 +59,19 @@ def create_app() -> Flask:
     @app.route("/")
     def dashboard():
         db = OpSession()
+        today = date.today()
+        on_loan_count = db.execute(text("""
+            SELECT COUNT(DISTINCT vehicle_id) FROM loan_transactions
+            WHERE loan_date <= :today AND return_date >= :today
+        """), {"today": today}).scalar() or 0
+        total_vehicles = db.query(Vehicle).count()
+
         kpis = {
-            "total_customers": db.query(Customer).count(),
-            "total_vehicles":  db.query(Vehicle).count(),
-            "available_vehicles": db.query(Vehicle).filter_by(is_available=True).count(),
-            "total_loans":     db.query(LoanTransaction).count(),
-            "total_branches":  db.query(Branch).count(),
+            "total_customers":    db.query(Customer).count(),
+            "total_vehicles":     total_vehicles,
+            "available_vehicles": total_vehicles - on_loan_count,
+            "total_loans":        db.query(LoanTransaction).count(),
+            "total_branches":     db.query(Branch).count(),
         }
 
         # Revenue summary
@@ -156,29 +163,53 @@ def create_app() -> Flask:
         db = OpSession()
         vtype = request.args.get("type", "")
         avail = request.args.get("available", "")
+        today = date.today()
+
+        # Find all vehicle IDs that have an active loan (today between loan_date and return_date)
+        active_loan_vehicles = set(
+            r[0] for r in db.execute(text("""
+                SELECT DISTINCT vehicle_id FROM loan_transactions
+                WHERE loan_date <= :today AND return_date >= :today
+            """), {"today": today}).fetchall()
+        )
+
+        # Build the vehicles list with computed availability
         q = db.query(Vehicle)
         if vtype:
             q = q.filter_by(vehicle_type=vtype)
+        all_vehicles = q.order_by(Vehicle.manufacturer, Vehicle.model).all()
+
+        # Compute availability and look up the active loan if any
+        vehicle_rows = []
+        for v in all_vehicles:
+            on_loan = v.vehicle_id in active_loan_vehicles
+            active_loan = None
+            if on_loan:
+                active_loan = db.execute(text("""
+                    SELECT lt.loan_id, lt.return_date, c.name AS customer_name
+                    FROM loan_transactions lt
+                    JOIN customers c ON lt.customer_id = c.customer_id
+                    WHERE lt.vehicle_id = :vid
+                      AND lt.loan_date <= :today
+                      AND lt.return_date >= :today
+                """), {"vid": v.vehicle_id, "today": today}).fetchone()
+            vehicle_rows.append({
+                "vehicle":     v,
+                "is_available": not on_loan,
+                "active_loan": active_loan,
+            })
+
+        # Apply availability filter post-computation
         if avail == "1":
-            q = q.filter_by(is_available=True)
+            vehicle_rows = [r for r in vehicle_rows if r["is_available"]]
         elif avail == "0":
-            q = q.filter_by(is_available=False)
-        vehicles = q.order_by(Vehicle.manufacturer, Vehicle.model).all()
-        types    = [r[0] for r in db.execute(text(
+            vehicle_rows = [r for r in vehicle_rows if not r["is_available"]]
+
+        types = [r[0] for r in db.execute(text(
             "SELECT DISTINCT vehicle_type FROM vehicles ORDER BY vehicle_type")).fetchall()]
         db.close()
-        return render_template("vehicles.html", vehicles=vehicles,
+        return render_template("vehicles.html", vehicle_rows=vehicle_rows,
                                types=types, sel_type=vtype, sel_avail=avail)
-
-    @app.route("/vehicles/<vid>/toggle", methods=["POST"])
-    def vehicle_toggle(vid):
-        db = OpSession()
-        v = db.query(Vehicle).get(vid)
-        v.is_available = not v.is_available
-        db.commit()
-        db.close()
-        flash(f"{v.manufacturer} {v.model} availability updated.", "info")
-        return redirect(url_for("vehicles"))
 
     @app.route("/vehicles/new", methods=["GET", "POST"])
     def vehicle_new():
@@ -328,16 +359,24 @@ def create_app() -> Flask:
                 ending_mileage   = end_km,
             )
             if veh:
-                veh.is_available = False
-                veh.mileage      = end_km
+                veh.mileage = end_km   # update odometer; availability is now derived
             db.add(loan)
             db.commit()
             flash("Loan transaction recorded.", "success")
             db.close()
             return redirect(url_for("loans"))
 
+        # Compute available vehicles dynamically based on overlapping active loans
+        today = date.today()
+        on_loan_ids = set(
+            r[0] for r in db.execute(text("""
+                SELECT DISTINCT vehicle_id FROM loan_transactions
+                WHERE loan_date <= :today AND return_date >= :today
+            """), {"today": today}).fetchall()
+        )
+        all_vehicles = db.query(Vehicle).order_by(Vehicle.manufacturer, Vehicle.model).all()
         customers = db.query(Customer).order_by(Customer.name).all()
-        vehicles  = db.query(Vehicle).filter_by(is_available=True).order_by(Vehicle.model).all()
+        vehicles  = [v for v in all_vehicles if v.vehicle_id not in on_loan_ids]
         brs       = db.query(Branch).order_by(Branch.branch_name).all()
         db.close()
         return render_template("loan_form.html",
