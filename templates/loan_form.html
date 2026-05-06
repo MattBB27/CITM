@@ -22,7 +22,9 @@
             <select name="vehicle_id" class="form-control" required>
               <option value="">— Select Vehicle —</option>
               {% for v in vehicles %}
-              <option value="{{ v.vehicle_id }}">{{ v.manufacturer }} {{ v.model }} ({{ v.vehicle_type }})</option>
+              <option value="{{ v.vehicle_id }}">
+                {{ v.manufacturer }} {{ v.model }} ({{ v.vehicle_type }}) · {{ v.vehicle_id }}
+              </option>
               {% endfor %}
             </select>
           </div>

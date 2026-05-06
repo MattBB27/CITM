@@ -92,13 +92,14 @@ def create_app() -> Flask:
         )
         db.close()
 
-        # Warehouse fact count — cached for 60s to avoid slow Synapse round-trip on every load
+        # Warehouse fact count — cached briefly to avoid Synapse round-trip on every load.
+        # Invalidated automatically when ETL runs.
         now = datetime.now()
         if _wh_cache["count"] is None or now > _wh_cache["expires"]:
             try:
                 wdb = WhSession()
                 _wh_cache["count"]   = wdb.query(FactLoanTransaction).count()
-                _wh_cache["expires"] = now + timedelta(seconds=60)
+                _wh_cache["expires"] = now + timedelta(seconds=15)
                 wdb.close()
             except Exception:
                 _wh_cache["count"] = 0
@@ -215,16 +216,17 @@ def create_app() -> Flask:
     def vehicle_new():
         if request.method == "POST":
             db = OpSession()
-            # Use max existing numeric suffix + 1 to avoid collisions
-            existing_ids = [v.vehicle_id for v in db.query(Vehicle).all()]
-            max_num = 0
-            for vid in existing_ids:
-                try:
-                    n = int(vid.split("-")[-1])
-                    if n > max_num: max_num = n
-                except (ValueError, IndexError):
-                    pass
-            new_id = f"VEH-{max_num+1:03d}"
+            existing_ids = set(v.vehicle_id for v in db.query(Vehicle).all())
+            # Generate a unique rego-style ID: 3 letters + 3 digits
+            import random, string
+            for _ in range(50):  # try up to 50 times to avoid collision
+                new_id = (
+                    "".join(random.choices(string.ascii_uppercase, k=3))
+                    + "-"
+                    + "".join(random.choices(string.digits, k=3))
+                )
+                if new_id not in existing_ids:
+                    break
 
             veh = Vehicle(
                 vehicle_id   = new_id,
@@ -236,7 +238,7 @@ def create_app() -> Flask:
             )
             db.add(veh)
             db.commit()
-            flash(f"Vehicle '{veh.manufacturer} {veh.model}' added as {new_id}.", "success")
+            flash(f"Vehicle '{veh.manufacturer} {veh.model}' added with rego {new_id}.", "success")
             db.close()
             return redirect(url_for("vehicles"))
         return render_template("vehicle_form.html", vehicle=None)
@@ -402,7 +404,10 @@ def create_app() -> Flask:
     def etl_run():
         result = run_etl()
         _etl_history.append(result)
-        _analytics_cache["data"] = None  # invalidate after ETL
+        # Invalidate caches so next page load shows fresh data
+        _analytics_cache["data"] = None
+        _wh_cache["count"]   = None
+        _wh_cache["expires"] = datetime.now()
         status  = "success" if result["status"] == "success" else "danger"
         message = (f"ETL completed in {result['total_duration_s']}s — "
                    f"{result.get('steps', {}).get('load_facts', {}).get('records_inserted', 0)}"
@@ -416,18 +421,37 @@ def create_app() -> Flask:
         return jsonify(_etl_history[-1] if _etl_history else {})
 
     # ── Analytics (with in-process cache) ─────────────────────────────────────
-    _analytics_cache = {"data": None, "ts": 0}
+    _analytics_cache = {"data": None, "ts": 0, "key": None}
     CACHE_TTL_S = 300   # 5 minutes
 
-    def _fetch_analytics():
+    def _fetch_analytics(rev_branch_year: str = "", vtype_branch: str = ""):
+        """
+        Fetch all analytics. Per-table filters:
+          - rev_branch_year: year filter applied to Revenue by Branch
+          - vtype_branch: branch_id filter applied to Vehicle Type Performance
+        Other tables remain unfiltered.
+        """
         wdb = WhSession()
         try:
+            # Build dynamic WHERE clauses
+            rb_where = ""
+            rb_params = {}
+            if rev_branch_year:
+                rb_where = "WHERE d.year = :year"
+                rb_params["year"] = int(rev_branch_year)
+
+            vt_where = ""
+            vt_params = {}
+            if vtype_branch:
+                vt_where = "WHERE b.branch_id = :branch_id"
+                vt_params["branch_id"] = vtype_branch
+
             data = {
                 # Headline KPIs across the entire warehouse
                 "headline": wdb.execute(text("""
-                    SELECT COUNT(loan_fact_key)                       AS total_loans,
-                           ROUND(CAST(SUM(loan_fee) AS FLOAT),2)        AS total_revenue,
-                           ROUND(CAST(AVG(loan_fee) AS FLOAT),2)        AS avg_fee,
+                    SELECT COUNT(loan_fact_key)                         AS total_loans,
+                           ROUND(CAST(SUM(loan_fee) AS FLOAT),2)          AS total_revenue,
+                           ROUND(CAST(AVG(loan_fee) AS FLOAT),2)          AS avg_fee,
                            ROUND(CAST(AVG(loan_duration_days) AS FLOAT),1) AS avg_days,
                            ROUND(CAST(AVG(distance_driven) AS FLOAT),0)    AS avg_distance
                     FROM fact_loan_transaction
@@ -445,16 +469,19 @@ def create_app() -> Flask:
                     ORDER BY d.year DESC
                 """)).fetchall(),
 
-                "rev_by_branch": wdb.execute(text("""
+                # Revenue by branch — year-filterable
+                "rev_by_branch": wdb.execute(text(f"""
                     SELECT b.branch_name, b.city,
                            COUNT(f.loan_fact_key) AS total_loans,
                            ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_revenue,
                            ROUND(CAST(AVG(f.loan_fee) AS FLOAT),2) AS avg_fee
                     FROM fact_loan_transaction f
                     JOIN dim_branch b ON f.branch_key = b.branch_key
+                    JOIN dim_date d ON f.loan_date_key = d.date_key
+                    {rb_where}
                     GROUP BY b.branch_name, b.city
                     ORDER BY total_revenue DESC
-                """)).fetchall(),
+                """), rb_params).fetchall(),
 
                 "rev_by_month": wdb.execute(text("""
                     SELECT d.year, d.month, d.month_name,
@@ -466,7 +493,8 @@ def create_app() -> Flask:
                     ORDER BY d.year, d.month
                 """)).fetchall(),
 
-                "vtype_usage": wdb.execute(text("""
+                # Vehicle type performance — branch-filterable
+                "vtype_usage": wdb.execute(text(f"""
                     SELECT v.vehicle_type,
                            COUNT(f.loan_fact_key) AS rentals,
                            ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days,
@@ -474,9 +502,11 @@ def create_app() -> Flask:
                            ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
                     FROM fact_loan_transaction f
                     JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
+                    JOIN dim_branch b ON f.branch_key = b.branch_key
+                    {vt_where}
                     GROUP BY v.vehicle_type
                     ORDER BY rentals DESC
-                """)).fetchall(),
+                """), vt_params).fetchall(),
 
                 "top_customers": wdb.execute(text("""
                     SELECT TOP 10 c.name, c.customer_id,
@@ -498,6 +528,16 @@ def create_app() -> Flask:
                     GROUP BY v.vehicle_type
                     ORDER BY avg_duration DESC
                 """)).fetchall(),
+
+                # Filter dropdown options
+                "available_years": [
+                    r[0] for r in wdb.execute(text(
+                        "SELECT DISTINCT year FROM dim_date ORDER BY year DESC"
+                    )).fetchall()
+                ],
+                "available_branches": wdb.execute(text(
+                    "SELECT branch_id, branch_name FROM dim_branch ORDER BY branch_name"
+                )).fetchall(),
             }
         finally:
             wdb.close()
@@ -506,19 +546,29 @@ def create_app() -> Flask:
     @app.route("/analytics")
     def analytics():
         import time as _t
-        force = request.args.get("refresh") == "1"
+        rev_branch_year = request.args.get("rb_year", "")
+        vtype_branch    = request.args.get("vt_branch", "")
+        force           = request.args.get("refresh") == "1"
+
+        cache_key = f"{rev_branch_year}|{vtype_branch}"
         now = _t.time()
         cache = _analytics_cache
 
-        if force or cache["data"] is None or (now - cache["ts"]) > CACHE_TTL_S:
-            cache["data"] = _fetch_analytics()
+        # Re-fetch if filters changed, cache expired, or refresh requested
+        if (force or cache["data"] is None
+                or cache.get("key") != cache_key
+                or (now - cache["ts"]) > CACHE_TTL_S):
+            cache["data"] = _fetch_analytics(rev_branch_year, vtype_branch)
             cache["ts"]   = now
+            cache["key"]  = cache_key
             cached_age = 0
         else:
             cached_age = int(now - cache["ts"])
 
         return render_template("analytics.html",
                                cached_age=cached_age,
+                               sel_rb_year=rev_branch_year,
+                               sel_vt_branch=vtype_branch,
                                **cache["data"])
 
 
