@@ -33,7 +33,7 @@ VEHICLES = [
     ("VEH-001", "Corolla",    "Toyota",     "Sedan",     18500),
     ("VEH-002", "Camry",      "Toyota",     "Sedan",     32100),
     ("VEH-003", "RAV4",       "Toyota",     "SUV",       27400),
-    ("VEH-004", "HiLux",      "Toyota",     "Ute",       45200),
+    ("VEH-004", "Hilux",      "Toyota",     "Ute",       45200),
     ("VEH-005", "Ranger",     "Ford",       "Ute",       38700),
     ("VEH-006", "Puma",       "Ford",       "SUV",       12300),
     ("VEH-007", "Mondeo",     "Ford",       "Sedan",     55800),

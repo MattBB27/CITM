@@ -221,30 +221,62 @@ def create_app() -> Flask:
     # ── Loans ─────────────────────────────────────────────────────────────────
     @app.route("/loans")
     def loans():
-        db  = OpSession()
-        search  = request.args.get("search", "").strip()
-        page    = int(request.args.get("page", 1))
-        per_page = 20
+        db = OpSession()
+        search       = request.args.get("search", "").strip()
+        branch_id    = request.args.get("branch", "")
+        vehicle_type = request.args.get("vehicle_type", "")
+        date_from    = request.args.get("date_from", "")
+        date_to      = request.args.get("date_to", "")
+        page         = int(request.args.get("page", 1))
+        per_page     = 20
 
         q = db.query(LoanTransaction).options(
             joinedload(LoanTransaction.customer),
             joinedload(LoanTransaction.vehicle),
             joinedload(LoanTransaction.branch)
         )
+
+        # Free-text search across IDs and customer name
         if search:
-            q = q.filter(LoanTransaction.loan_id.contains(search) |
-                         LoanTransaction.customer_id.contains(search) |
-                         LoanTransaction.vehicle_id.contains(search))
+            q = q.join(LoanTransaction.customer).filter(
+                LoanTransaction.loan_id.contains(search) |
+                LoanTransaction.customer_id.contains(search) |
+                LoanTransaction.vehicle_id.contains(search) |
+                Customer.name.contains(search)
+            )
+
+        # Branch filter
+        if branch_id:
+            q = q.filter(LoanTransaction.branch_id == branch_id)
+
+        # Vehicle type filter
+        if vehicle_type:
+            q = q.join(LoanTransaction.vehicle).filter(Vehicle.vehicle_type == vehicle_type)
+
+        # Date range filter
+        if date_from:
+            q = q.filter(LoanTransaction.loan_date >= date.fromisoformat(date_from))
+        if date_to:
+            q = q.filter(LoanTransaction.loan_date <= date.fromisoformat(date_to))
 
         total = q.count()
         txns  = (q.order_by(LoanTransaction.loan_date.desc())
                   .offset((page - 1) * per_page)
                   .limit(per_page)
                   .all())
+
+        # Filter dropdown options
+        branches = db.query(Branch).order_by(Branch.branch_name).all()
+        vehicle_types = [r[0] for r in db.execute(text(
+            "SELECT DISTINCT vehicle_type FROM vehicles ORDER BY vehicle_type")).fetchall()]
+
         db.close()
         pages = (total + per_page - 1) // per_page
-        return render_template("loans.html", loans=txns, total=total,
-                               page=page, pages=pages, search=search)
+        return render_template("loans.html",
+                               loans=txns, total=total, page=page, pages=pages,
+                               search=search, branch_id=branch_id,
+                               vehicle_type=vehicle_type, date_from=date_from, date_to=date_to,
+                               branches=branches, vehicle_types=vehicle_types)
 
     @app.route("/loans/new", methods=["GET", "POST"])
     def loan_new():
