@@ -46,7 +46,7 @@ def main():
 
     from src.app import create_app
     app = create_app()
-    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG)
+    app.run(host=config.HOST, port=config.PORT, debug=config.DEBUG, use_reloader=False)
 
 if __name__ == "__main__":
     main()

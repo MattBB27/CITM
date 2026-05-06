@@ -12,7 +12,7 @@ Exposes:
   /analytics      — Warehouse analytics queries (FR 5.2)
 """
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, joinedload
@@ -27,11 +27,28 @@ from src.models.warehouse import (
 from src.etl.pipeline import run_etl
 
 # ── Engine / Session setup ────────────────────────────────────────────────────
-op_engine = create_engine(config.OPERATIONAL_DB_URL, connect_args={"check_same_thread": False})
-wh_engine = create_engine(config.WAREHOUSE_DB_URL,   connect_args={"check_same_thread": False})
+# ── Engine / Session setup ────────────────────────────────────────────────────
+# pool_pre_ping=True — drops stale Azure connections that time out after inactivity
+# pool_recycle=1800  — recycle connections every 30 min (Azure closes idle at ~30min)
+op_engine = create_engine(
+    config.OPERATIONAL_DB_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in config.OPERATIONAL_DB_URL else {},
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
+wh_engine = create_engine(
+    config.WAREHOUSE_DB_URL,
+    connect_args={"check_same_thread": False} if "sqlite" in config.WAREHOUSE_DB_URL else {},
+    pool_pre_ping=True,
+    pool_recycle=1800,
+    execution_options={"isolation_level": "AUTOCOMMIT"},
+)
 
 OpSession = sessionmaker(bind=op_engine)
 WhSession = sessionmaker(bind=wh_engine)
+
+# Simple in-process cache for the warehouse fact count (avoids hitting Synapse on every page load)
+_wh_cache = {"count": None, "expires": datetime.min}
 
 # ── App factory ───────────────────────────────────────────────────────────────
 def create_app() -> Flask:
@@ -68,11 +85,17 @@ def create_app() -> Flask:
         )
         db.close()
 
-        # Warehouse status
-        wdb = WhSession()
-        wh_loaded = wdb.query(FactLoanTransaction).count()
-        wdb.close()
-        kpis["wh_fact_rows"] = wh_loaded
+        # Warehouse fact count — cached for 60s to avoid slow Synapse round-trip on every load
+        now = datetime.now()
+        if _wh_cache["count"] is None or now > _wh_cache["expires"]:
+            try:
+                wdb = WhSession()
+                _wh_cache["count"]   = wdb.query(FactLoanTransaction).count()
+                _wh_cache["expires"] = now + timedelta(seconds=60)
+                wdb.close()
+            except Exception:
+                _wh_cache["count"] = 0
+        kpis["wh_fact_rows"] = _wh_cache["count"]
 
         return render_template("dashboard.html", kpis=kpis, recent=recent)
 
@@ -282,60 +305,59 @@ def create_app() -> Flask:
     def analytics():
         wdb = WhSession()
 
-        # Revenue by branch
+        # Revenue by branch — full GROUP BY required for Synapse
         rev_by_branch = wdb.execute(text("""
             SELECT b.branch_name, b.city,
-                   COUNT(f.loan_fact_key)  AS total_loans,
-                   ROUND(SUM(f.loan_fee),2) AS total_revenue,
-                   ROUND(AVG(f.loan_fee),2) AS avg_fee
+                   COUNT(f.loan_fact_key) AS total_loans,
+                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_revenue,
+                   ROUND(CAST(AVG(f.loan_fee) AS FLOAT),2) AS avg_fee
             FROM fact_loan_transaction f
             JOIN dim_branch b ON f.branch_key = b.branch_key
-            GROUP BY b.branch_key
+            GROUP BY b.branch_name, b.city
             ORDER BY total_revenue DESC
         """)).fetchall()
 
         # Revenue by month
         rev_by_month = wdb.execute(text("""
             SELECT d.year, d.month, d.month_name,
-                   COUNT(f.loan_fact_key)   AS loans,
-                   ROUND(SUM(f.loan_fee),2)  AS revenue
+                   COUNT(f.loan_fact_key) AS loans,
+                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
             FROM fact_loan_transaction f
             JOIN dim_date d ON f.loan_date_key = d.date_key
-            GROUP BY d.year, d.month
+            GROUP BY d.year, d.month, d.month_name
             ORDER BY d.year, d.month
         """)).fetchall()
 
         # Top vehicle types
         vtype_usage = wdb.execute(text("""
             SELECT v.vehicle_type,
-                   COUNT(f.loan_fact_key)         AS rentals,
-                   ROUND(AVG(f.loan_duration_days),1) AS avg_days,
-                   ROUND(AVG(f.distance_driven),0)    AS avg_km,
-                   ROUND(SUM(f.loan_fee),2)            AS revenue
+                   COUNT(f.loan_fact_key) AS rentals,
+                   ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days,
+                   ROUND(CAST(AVG(f.distance_driven) AS FLOAT),0) AS avg_km,
+                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
             FROM fact_loan_transaction f
             JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
             GROUP BY v.vehicle_type
             ORDER BY rentals DESC
         """)).fetchall()
 
-        # Top customers
+        # Top customers — TOP instead of LIMIT for T-SQL
         top_customers = wdb.execute(text("""
-            SELECT c.name, c.customer_id,
-                   COUNT(f.loan_fact_key)         AS rentals,
-                   ROUND(SUM(f.loan_fee),2)        AS total_spent,
-                   ROUND(AVG(f.loan_duration_days),1) AS avg_days
+            SELECT TOP 10 c.name, c.customer_id,
+                   COUNT(f.loan_fact_key) AS rentals,
+                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_spent,
+                   ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days
             FROM fact_loan_transaction f
             JOIN dim_customer c ON f.customer_key = c.customer_key
-            GROUP BY c.customer_key
+            GROUP BY c.name, c.customer_id
             ORDER BY total_spent DESC
-            LIMIT 10
         """)).fetchall()
 
-        # Average duration by vehicle type
+        # Duration by vehicle type
         duration_by_type = wdb.execute(text("""
             SELECT v.vehicle_type,
-                   ROUND(AVG(f.loan_duration_days),1)  AS avg_duration,
-                   ROUND(AVG(f.distance_driven),0)      AS avg_distance
+                   ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_duration,
+                   ROUND(CAST(AVG(f.distance_driven) AS FLOAT),0) AS avg_distance
             FROM fact_loan_transaction f
             JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
             GROUP BY v.vehicle_type

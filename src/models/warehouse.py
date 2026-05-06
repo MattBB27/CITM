@@ -2,15 +2,12 @@
 Data Warehouse Models — Star Schema (CITM Data Warehouse)
 ----------------------------------------------------------
 Implements the dimensional model specified in the CITM design document.
-In production this would reside in Azure Synapse Analytics.
+Resides in Azure Synapse Analytics (Dedicated SQL Pool).
 
-Star Schema:
-    fact_loan_transaction  ─── dim_customer
-                           ─── dim_vehicle
-                           ─── dim_date  (loan_date_key, return_date_key)
-                           ─── dim_branch
+Note: Synapse does not support enforced UNIQUE or FOREIGN KEY constraints.
+      Relationships use explicit primaryjoin expressions instead.
 """
-from sqlalchemy import Column, Integer, String, Date, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, Date, Numeric
 from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
@@ -22,33 +19,37 @@ class DimCustomer(Base):
     __tablename__ = "dim_customer"
 
     customer_key          = Column(Integer, primary_key=True, autoincrement=True)
-    customer_id           = Column(String(50),  nullable=False, unique=True)   # NK
+    customer_id           = Column(String(50), nullable=False)   # NK
     name                  = Column(String(100))
     driver_license_number = Column(String(50))
 
-    loans = relationship("FactLoanTransaction",
-                         foreign_keys="FactLoanTransaction.customer_key",
-                         back_populates="customer")
+    loans = relationship(
+        "FactLoanTransaction",
+        primaryjoin="DimCustomer.customer_key == foreign(FactLoanTransaction.customer_key)",
+        back_populates="customer",
+    )
 
 
 class DimVehicle(Base):
     __tablename__ = "dim_vehicle"
 
     vehicle_key  = Column(Integer, primary_key=True, autoincrement=True)
-    vehicle_id   = Column(String(50),  nullable=False, unique=True)            # NK
+    vehicle_id   = Column(String(50), nullable=False)            # NK
     model        = Column(String(100))
     manufacturer = Column(String(100))
     vehicle_type = Column(String(50))
 
-    loans = relationship("FactLoanTransaction",
-                         foreign_keys="FactLoanTransaction.vehicle_key",
-                         back_populates="vehicle")
+    loans = relationship(
+        "FactLoanTransaction",
+        primaryjoin="DimVehicle.vehicle_key == foreign(FactLoanTransaction.vehicle_key)",
+        back_populates="vehicle",
+    )
 
 
 class DimDate(Base):
     __tablename__ = "dim_date"
 
-    date_key     = Column(Integer, primary_key=True)   # YYYYMMDD — acts as PK + NK
+    date_key     = Column(Integer, primary_key=True)   # YYYYMMDD
     full_date    = Column(Date,    nullable=False)
     day          = Column(Integer)
     month        = Column(Integer)
@@ -62,14 +63,16 @@ class DimBranch(Base):
     __tablename__ = "dim_branch"
 
     branch_key  = Column(Integer, primary_key=True, autoincrement=True)
-    branch_id   = Column(String(50),  nullable=False, unique=True)             # NK
+    branch_id   = Column(String(50), nullable=False)             # NK
     branch_name = Column(String(100))
     city        = Column(String(50))
     state       = Column(String(50))
 
-    loans = relationship("FactLoanTransaction",
-                         foreign_keys="FactLoanTransaction.branch_key",
-                         back_populates="branch")
+    loans = relationship(
+        "FactLoanTransaction",
+        primaryjoin="DimBranch.branch_key == foreign(FactLoanTransaction.branch_key)",
+        back_populates="branch",
+    )
 
 
 # ── Fact Table ────────────────────────────────────────────────────────────────
@@ -77,28 +80,46 @@ class DimBranch(Base):
 class FactLoanTransaction(Base):
     __tablename__ = "fact_loan_transaction"
 
-    loan_fact_key     = Column(Integer, primary_key=True, autoincrement=True)
+    loan_fact_key      = Column(Integer, primary_key=True, autoincrement=True)
 
-    # Foreign keys → dimension tables
-    customer_key      = Column(Integer, ForeignKey("dim_customer.customer_key"))
-    vehicle_key       = Column(Integer, ForeignKey("dim_vehicle.vehicle_key"))
-    loan_date_key     = Column(Integer, ForeignKey("dim_date.date_key"))
-    return_date_key   = Column(Integer, ForeignKey("dim_date.date_key"))
-    branch_key        = Column(Integer, ForeignKey("dim_branch.branch_key"))
+    # Keys (no FK constraints — Synapse Dedicated Pool limitation)
+    customer_key       = Column(Integer)
+    vehicle_key        = Column(Integer)
+    loan_date_key      = Column(Integer)
+    return_date_key    = Column(Integer)
+    branch_key         = Column(Integer)
 
-    # Degenerate dimension (traceability back to source)
-    source_loan_id    = Column(String(50), unique=True)
+    # Degenerate dimension
+    source_loan_id     = Column(String(50))
 
-    # Measures / facts
-    loan_fee          = Column(Numeric(10, 2))
+    # Measures
+    loan_fee           = Column(Numeric(10, 2))
     loan_duration_days = Column(Integer)
-    distance_driven   = Column(Integer)
-    starting_mileage  = Column(Integer)
-    ending_mileage    = Column(Integer)
+    distance_driven    = Column(Integer)
+    starting_mileage   = Column(Integer)
+    ending_mileage     = Column(Integer)
 
-    # Relationships
-    customer  = relationship("DimCustomer", foreign_keys=[customer_key],    back_populates="loans")
-    vehicle   = relationship("DimVehicle",  foreign_keys=[vehicle_key],     back_populates="loans")
-    branch    = relationship("DimBranch",   foreign_keys=[branch_key],      back_populates="loans")
-    loan_date = relationship("DimDate",     foreign_keys=[loan_date_key])
-    ret_date  = relationship("DimDate",     foreign_keys=[return_date_key])
+    # Relationships with explicit join conditions
+    customer = relationship(
+        "DimCustomer",
+        primaryjoin="foreign(FactLoanTransaction.customer_key) == DimCustomer.customer_key",
+        back_populates="loans",
+    )
+    vehicle = relationship(
+        "DimVehicle",
+        primaryjoin="foreign(FactLoanTransaction.vehicle_key) == DimVehicle.vehicle_key",
+        back_populates="loans",
+    )
+    branch = relationship(
+        "DimBranch",
+        primaryjoin="foreign(FactLoanTransaction.branch_key) == DimBranch.branch_key",
+        back_populates="loans",
+    )
+    loan_date = relationship(
+        "DimDate",
+        primaryjoin="foreign(FactLoanTransaction.loan_date_key) == DimDate.date_key",
+    )
+    ret_date = relationship(
+        "DimDate",
+        primaryjoin="foreign(FactLoanTransaction.return_date_key) == DimDate.date_key",
+    )
