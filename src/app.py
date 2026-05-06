@@ -263,7 +263,14 @@ def create_app() -> Flask:
             start_km = veh.mileage if veh else 0
             loan_date   = date.fromisoformat(request.form["loan_date"])
             return_date = date.fromisoformat(request.form["return_date"])
-            days        = (return_date - loan_date).days or 1
+
+            # Validation: return date must be after loan date
+            if return_date <= loan_date:
+                flash("Return date must be after the loan date.", "danger")
+                db.close()
+                return redirect(url_for("loan_new"))
+
+            days = (return_date - loan_date).days
 
             # Fee: use form value if present and non-empty, else auto-calc by vehicle type
             fee_raw = request.form.get("loan_fee", "").strip()

@@ -12,7 +12,7 @@
           <select name="customer_id" class="form-control" required>
             <option value="">— Select Customer —</option>
             {% for c in customers %}
-              <option value="{{ c.customer_id }}">{{ c.name }} ({{ c.customer_id }})</option>
+            <option value="{{ c.customer_id }}">{{ c.name }} ({{ c.customer_id }})</option>
             {% endfor %}
           </select>
         </div>
@@ -22,7 +22,7 @@
             <select name="vehicle_id" class="form-control" required>
               <option value="">— Select Vehicle —</option>
               {% for v in vehicles %}
-                <option value="{{ v.vehicle_id }}">{{ v.manufacturer }} {{ v.model }} ({{ v.vehicle_type }})</option>
+              <option value="{{ v.vehicle_id }}">{{ v.manufacturer }} {{ v.model }} ({{ v.vehicle_type }})</option>
               {% endfor %}
             </select>
           </div>
@@ -31,7 +31,7 @@
             <select name="branch_id" class="form-control" required>
               <option value="">— Select Branch —</option>
               {% for b in branches %}
-                <option value="{{ b.branch_id }}">{{ b.branch_name }}</option>
+              <option value="{{ b.branch_id }}">{{ b.branch_name }}</option>
               {% endfor %}
             </select>
           </div>
@@ -39,16 +39,17 @@
         <div class="grid-2">
           <div class="form-group">
             <label class="form-label">Loan Date *</label>
-            <input name="loan_date" type="date" class="form-control" required>
+            <input name="loan_date" id="loan_date" type="date" class="form-control" required
+              onchange="document.getElementById('return_date').min = this.value">
           </div>
           <div class="form-group">
             <label class="form-label">Return Date *</label>
-            <input name="return_date" type="date" class="form-control" required>
+            <input name="return_date" id="return_date" type="date" class="form-control" required>
           </div>
         </div>
         <div class="form-group">
           <label class="form-label">Loan Fee ($) — leave blank for auto-calculation</label>
-          <input name="loan_fee" type="number" step="0.01" class="form-control" placeholder="Auto">
+          <input name="loan_fee" type="number" step="0.01" min="0" class="form-control" placeholder="Auto">
         </div>
         <div class="flex gap-2">
           <button type="submit" class="btn btn-primary">Record Transaction</button>
@@ -58,4 +59,15 @@
     </div>
   </div>
 </div>
+<script>
+  // Extra guard: prevent same-day or before-loan return date
+  document.querySelector('form').addEventListener('submit', function (e) {
+    const loan = document.getElementById('loan_date').value;
+    const ret = document.getElementById('return_date').value;
+    if (loan && ret && ret <= loan) {
+      e.preventDefault();
+      alert('Return date must be after the loan date.');
+    }
+  });
+</script>
 {% endblock %}
