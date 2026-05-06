@@ -288,6 +288,7 @@ def create_app() -> Flask:
     def etl_run():
         result = run_etl()
         _etl_history.append(result)
+        _analytics_cache["data"] = None  # invalidate after ETL
         status  = "success" if result["status"] == "success" else "danger"
         message = (f"ETL completed in {result['total_duration_s']}s — "
                    f"{result.get('steps', {}).get('load_facts', {}).get('records_inserted', 0)}"
@@ -300,77 +301,90 @@ def create_app() -> Flask:
         """JSON endpoint for ETL history (last run)."""
         return jsonify(_etl_history[-1] if _etl_history else {})
 
-    # ── Analytics ─────────────────────────────────────────────────────────────
+    # ── Analytics (with in-process cache) ─────────────────────────────────────
+    _analytics_cache = {"data": None, "ts": 0}
+    CACHE_TTL_S = 300   # 5 minutes
+
+    def _fetch_analytics():
+        wdb = WhSession()
+        try:
+            data = {
+                "rev_by_branch": wdb.execute(text("""
+                    SELECT b.branch_name, b.city,
+                           COUNT(f.loan_fact_key) AS total_loans,
+                           ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_revenue,
+                           ROUND(CAST(AVG(f.loan_fee) AS FLOAT),2) AS avg_fee
+                    FROM fact_loan_transaction f
+                    JOIN dim_branch b ON f.branch_key = b.branch_key
+                    GROUP BY b.branch_name, b.city
+                    ORDER BY total_revenue DESC
+                """)).fetchall(),
+
+                "rev_by_month": wdb.execute(text("""
+                    SELECT d.year, d.month, d.month_name,
+                           COUNT(f.loan_fact_key) AS loans,
+                           ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
+                    FROM fact_loan_transaction f
+                    JOIN dim_date d ON f.loan_date_key = d.date_key
+                    GROUP BY d.year, d.month, d.month_name
+                    ORDER BY d.year, d.month
+                """)).fetchall(),
+
+                "vtype_usage": wdb.execute(text("""
+                    SELECT v.vehicle_type,
+                           COUNT(f.loan_fact_key) AS rentals,
+                           ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days,
+                           ROUND(CAST(AVG(f.distance_driven) AS FLOAT),0) AS avg_km,
+                           ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
+                    FROM fact_loan_transaction f
+                    JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
+                    GROUP BY v.vehicle_type
+                    ORDER BY rentals DESC
+                """)).fetchall(),
+
+                "top_customers": wdb.execute(text("""
+                    SELECT TOP 10 c.name, c.customer_id,
+                           COUNT(f.loan_fact_key) AS rentals,
+                           ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_spent,
+                           ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days
+                    FROM fact_loan_transaction f
+                    JOIN dim_customer c ON f.customer_key = c.customer_key
+                    GROUP BY c.name, c.customer_id
+                    ORDER BY total_spent DESC
+                """)).fetchall(),
+
+                "duration_by_type": wdb.execute(text("""
+                    SELECT v.vehicle_type,
+                           ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_duration,
+                           ROUND(CAST(AVG(f.distance_driven) AS FLOAT),0) AS avg_distance
+                    FROM fact_loan_transaction f
+                    JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
+                    GROUP BY v.vehicle_type
+                    ORDER BY avg_duration DESC
+                """)).fetchall(),
+            }
+        finally:
+            wdb.close()
+        return data
+
     @app.route("/analytics")
     def analytics():
-        wdb = WhSession()
+        import time as _t
+        force = request.args.get("refresh") == "1"
+        now = _t.time()
+        cache = _analytics_cache
 
-        # Revenue by branch — full GROUP BY required for Synapse
-        rev_by_branch = wdb.execute(text("""
-            SELECT b.branch_name, b.city,
-                   COUNT(f.loan_fact_key) AS total_loans,
-                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_revenue,
-                   ROUND(CAST(AVG(f.loan_fee) AS FLOAT),2) AS avg_fee
-            FROM fact_loan_transaction f
-            JOIN dim_branch b ON f.branch_key = b.branch_key
-            GROUP BY b.branch_name, b.city
-            ORDER BY total_revenue DESC
-        """)).fetchall()
-
-        # Revenue by month
-        rev_by_month = wdb.execute(text("""
-            SELECT d.year, d.month, d.month_name,
-                   COUNT(f.loan_fact_key) AS loans,
-                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
-            FROM fact_loan_transaction f
-            JOIN dim_date d ON f.loan_date_key = d.date_key
-            GROUP BY d.year, d.month, d.month_name
-            ORDER BY d.year, d.month
-        """)).fetchall()
-
-        # Top vehicle types
-        vtype_usage = wdb.execute(text("""
-            SELECT v.vehicle_type,
-                   COUNT(f.loan_fact_key) AS rentals,
-                   ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days,
-                   ROUND(CAST(AVG(f.distance_driven) AS FLOAT),0) AS avg_km,
-                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS revenue
-            FROM fact_loan_transaction f
-            JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
-            GROUP BY v.vehicle_type
-            ORDER BY rentals DESC
-        """)).fetchall()
-
-        # Top customers — TOP instead of LIMIT for T-SQL
-        top_customers = wdb.execute(text("""
-            SELECT TOP 10 c.name, c.customer_id,
-                   COUNT(f.loan_fact_key) AS rentals,
-                   ROUND(CAST(SUM(f.loan_fee) AS FLOAT),2) AS total_spent,
-                   ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_days
-            FROM fact_loan_transaction f
-            JOIN dim_customer c ON f.customer_key = c.customer_key
-            GROUP BY c.name, c.customer_id
-            ORDER BY total_spent DESC
-        """)).fetchall()
-
-        # Duration by vehicle type
-        duration_by_type = wdb.execute(text("""
-            SELECT v.vehicle_type,
-                   ROUND(CAST(AVG(f.loan_duration_days) AS FLOAT),1) AS avg_duration,
-                   ROUND(CAST(AVG(f.distance_driven) AS FLOAT),0) AS avg_distance
-            FROM fact_loan_transaction f
-            JOIN dim_vehicle v ON f.vehicle_key = v.vehicle_key
-            GROUP BY v.vehicle_type
-            ORDER BY avg_duration DESC
-        """)).fetchall()
-
-        wdb.close()
+        if force or cache["data"] is None or (now - cache["ts"]) > CACHE_TTL_S:
+            cache["data"] = _fetch_analytics()
+            cache["ts"]   = now
+            cached_age = 0
+        else:
+            cached_age = int(now - cache["ts"])
 
         return render_template("analytics.html",
-                               rev_by_branch=rev_by_branch,
-                               rev_by_month=rev_by_month,
-                               vtype_usage=vtype_usage,
-                               top_customers=top_customers,
-                               duration_by_type=duration_by_type)
+                               cached_age=cached_age,
+                               **cache["data"])
+
+
 
     return app

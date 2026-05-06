@@ -2,6 +2,15 @@
 {% block title %}Analytics{% endblock %}
 {% block page_title %}Analytics{% endblock %}
 
+{% block topbar_actions %}
+{% if rev_by_branch %}
+<a href="{{ url_for('analytics', refresh=1) }}" class="btn btn-outline btn-sm">⟳ Refresh</a>
+{% if cached_age and cached_age > 0 %}
+<span class="text-muted mono" style="font-size:11px;margin-left:8px">cached {{ cached_age }}s ago</span>
+{% endif %}
+{% endif %}
+{% endblock %}
+
 {% block content %}
 {% if not rev_by_branch %}
 <div class="card">
@@ -20,7 +29,13 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Branch</th><th>City</th><th>Total Loans</th><th>Total Revenue</th><th>Avg Fee</th></tr>
+        <tr>
+          <th>Branch</th>
+          <th>City</th>
+          <th>Total Loans</th>
+          <th>Total Revenue</th>
+          <th>Avg Fee</th>
+        </tr>
       </thead>
       <tbody>
         {% for row in rev_by_branch %}
@@ -44,7 +59,12 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>Type</th><th>Rentals</th><th>Avg Days</th><th>Revenue</th></tr>
+          <tr>
+            <th>Type</th>
+            <th>Rentals</th>
+            <th>Avg Days</th>
+            <th>Revenue</th>
+          </tr>
         </thead>
         <tbody>
           {% for row in vtype_usage %}
@@ -68,7 +88,12 @@
     <div class="table-wrap">
       <table>
         <thead>
-          <tr><th>#</th><th>Customer</th><th>Rentals</th><th>Total Spent</th></tr>
+          <tr>
+            <th>#</th>
+            <th>Customer</th>
+            <th>Rentals</th>
+            <th>Total Spent</th>
+          </tr>
         </thead>
         <tbody>
           {% for row in top_customers %}
@@ -91,7 +116,13 @@
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Month</th><th>Year</th><th>Loans</th><th>Revenue</th><th>Bar</th></tr>
+        <tr>
+          <th>Month</th>
+          <th>Year</th>
+          <th>Loans</th>
+          <th>Revenue</th>
+          <th>Bar</th>
+        </tr>
       </thead>
       <tbody>
         {% set max_rev = rev_by_month | map(attribute=4) | max %}
@@ -103,7 +134,8 @@
           <td class="text-success mono">${{ "%.0f"|format(row[4]) }}</td>
           <td style="width:200px">
             <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-              <div style="height:100%;width:{{ (row[4]/max_rev*100)|int }}%;background:var(--accent);border-radius:3px"></div>
+              <div style="height:100%;width:{{ (row[4]/max_rev*100)|int }}%;background:var(--accent);border-radius:3px">
+              </div>
             </div>
           </td>
         </tr>
