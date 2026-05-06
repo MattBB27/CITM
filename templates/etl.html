@@ -8,22 +8,22 @@
   <div class="card">
     <div class="card-header">Pipeline Control</div>
     <div class="card-body">
-      <p style="color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.7">
-        Runs the full <strong style="color:var(--text)">Extract → Transform → Load</strong> sequence
+      <p style="color:#8aa1c4;font-size:13px;margin-bottom:16px;line-height:1.7">
+        Runs the full Extract → Transform → Load sequence
         against the operational database and loads results into the data warehouse star schema.
-        Incremental load — only new records are inserted.
+        Incremental load; only new records are inserted.
       </p>
       <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
         <div class="flex gap-2" style="font-size:12px">
           <span class="badge badge-blue">EXTRACT</span>
           <span class="text-muted">SQLAlchemy → pandas DataFrames</span>
         </div>
-        <div style="padding-left:14px;color:var(--muted);font-size:11px">↓</div>
+        <div style="padding-left:14px;color:#8aa1c4;font-size:11px">↓</div>
         <div class="flex gap-2" style="font-size:12px">
           <span class="badge badge-orange">TRANSFORM</span>
           <span class="text-muted">Type coercion · dedup · key generation</span>
         </div>
-        <div style="padding-left:14px;color:var(--muted);font-size:11px">↓</div>
+        <div style="padding-left:14px;color:#8aa1c4;font-size:11px">↓</div>
         <div class="flex gap-2" style="font-size:12px">
           <span class="badge badge-green">LOAD</span>
           <span class="text-muted">Upsert dims · append facts</span>
@@ -110,28 +110,28 @@
           <td class="mono" style="font-size:11px">{{ run.started_at }}</td>
           <td>
             {% if run.status == 'success' %}
-              <span class="badge badge-green">SUCCESS</span>
+            <span class="badge badge-green">SUCCESS</span>
             {% else %}
-              <span class="badge badge-red">FAILED</span>
+            <span class="badge badge-red">FAILED</span>
             {% endif %}
           </td>
           <td class="mono">{{ run.total_duration_s }}s</td>
           <td class="mono" style="font-size:11px">
             {% if run.steps.extract is defined %}
-              {{ run.steps.extract.records_extracted.loans }} loans
+            {{ run.steps.extract.records_extracted.loans }} loans
             {% endif %}
           </td>
           <td class="mono">
             {% if run.steps.load_facts is defined %}
-              {{ run.steps.load_facts.records_inserted }}
+            {{ run.steps.load_facts.records_inserted }}
             {% endif %}
           </td>
           <td class="mono" style="font-size:11px">
             {% if run.steps.load_dimensions is defined %}
-              C:{{ run.steps.load_dimensions.dim_customer }}
-              V:{{ run.steps.load_dimensions.dim_vehicle }}
-              B:{{ run.steps.load_dimensions.dim_branch }}
-              D:{{ run.steps.load_dimensions.dim_date }}
+            C:{{ run.steps.load_dimensions.dim_customer }}
+            V:{{ run.steps.load_dimensions.dim_vehicle }}
+            B:{{ run.steps.load_dimensions.dim_branch }}
+            D:{{ run.steps.load_dimensions.dim_date }}
             {% endif %}
           </td>
         </tr>
