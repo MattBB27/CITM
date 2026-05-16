@@ -1,0 +1,98 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# Secrets / credentials
+secrets.json
+credentials.json
+config.local.py
+
+# =========================
+# Database / Warehouse
+# =========================
+*.db
+*.sqlite
+*.sqlite3
+
+# Exported warehouse data
+*.csv
+*.parquet
+*.feather
+
+# Power BI / BI exports
+*.pbix
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+
+# =========================
+# Jupyter / Data Science
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# IDEs / Editors
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Testing / Coverage
+# =========================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Build / Distribution
+# =========================
+build/
+dist/
+*.egg-info/
+
+# =========================
+# Azure / Cloud
+# =========================
+.azure/
+terraform.tfstate
+terraform.tfstate.*
+*.pem
+*.key
+*.pfx
+
+# =========================
+# Docker
+# =========================
+docker-compose.override.yml
+
+# =========================
+# Temporary files
+# =========================
+tmp/
+temp/
+*.tmp
