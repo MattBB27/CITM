@@ -1,6 +1,6 @@
-# CITM — Car Rental Inventory Management System
+# CITM: Car Rental Inventory Management System
 
-> End-to-end data system: operational OLTP app, Python ETL pipeline, and cloud data warehouse with star-schema analytics and a Power BI dashboard.
+> Cloud-native data system designed for Azure. Flask operational application, Python ETL pipeline, and Kimball star-schema warehouse on Azure Synapse, consumed by both an in-app analytics page and an external Power BI dashboard.
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
@@ -16,10 +16,12 @@
 
 ## Overview
 
-CITM is a centralised car rental inventory and transaction management system delivered as a two-part academic project. It demonstrates the full lifecycle of a modern data system — from operational data capture through cloud ETL into a dimensional warehouse, with both in-app and external BI analytics.
+CITM is a centralised car rental inventory and transaction management system delivered as a two-part academic project. It demonstrates the full lifecycle of a modern data system: operational data capture, cloud ETL into a dimensional warehouse, and analytical reporting through both an in-app page and an external BI tool.
 
-- **Assignment 1** — [Data System Requirements & Design Specifications](./Assignment%201%20Data%20System%20Requirements%20and%20design%20specifications%20%284%29.pdf) (informational/functional/non-functional requirements, context diagram, star-schema ERD, data dictionary)
-- **Assignment 2** — this repository: a working implementation of the design, deployed against Microsoft Azure
+The data layer runs live on Microsoft Azure: an Azure SQL Database for the operational store and an Azure Synapse Dedicated SQL Pool for the analytics warehouse, both provisioned through the Azure portal and consumed via real ODBC connection strings (see `config.py` for the structure). Roughly $130 of Azure free credits was spent operating the cloud resources over the course of the project. The Flask application and ETL pipeline run locally against the live cloud databases, in a production deployment they'd also be cloud-hosted (Azure Container Apps + Azure Data Factory).
+
+- **Assignment 1**: [Data System Requirements & Design Specifications](./Assignment%201%20Data%20System%20Requirements%20and%20design%20specifications%20%284%29.pdf) (informational/functional/non-functional requirements, context diagram, star-schema ERD, data dictionary)
+- **Assignment 2**: this repository, a working implementation of the design against live Azure data services
 
 ## What this project demonstrates
 
@@ -278,12 +280,18 @@ python -m pytest tests/ -v
 
 ---
 
+## Deployment scope
+
+The data layer is fully cloud-hosted on Azure — the Azure SQL Database and Azure Synapse Dedicated SQL Pool are real, provisioned resources accessed through standard connection strings, not local emulators or stubs. The ETL pipeline performs genuine cross-cloud reads from Azure SQL into pandas DataFrames and writes back to Synapse over ODBC.
+
+The Flask application and ETL pipeline themselves run on the developer's machine for the scope of this project. A production deployment of the same code would containerise the app to Azure Container Apps (or App Service) and orchestrate the ETL on a schedule via Azure Data Factory or Azure Functions — no code changes to the ETL or data models would be required.
+
 ## Known limitations & future extensions
 
 - **No authentication / RBAC** — out of scope for the data-architecture focus of this assignment. A production extension would use Azure AD for SSO and Synapse Row-Level Security for branch-scoped data access.
 - **No vehicle home-branch** — vehicles aren't tied to a specific branch; in production each vehicle would have a `branch_id` foreign key for fleet allocation analytics.
-- **Single-region deployment** — geo-replication and DR would be added for production resilience.
-- **Manual ETL trigger** — production would orchestrate via Azure Data Factory on a schedule.
+- **Single-region database deployment** — the Azure resources sit in one region; geo-replication and DR would be added for production resilience.
+- **Manual ETL trigger** — production would orchestrate via Azure Data Factory on a schedule rather than from the web UI or CLI.
 
 ---
 
