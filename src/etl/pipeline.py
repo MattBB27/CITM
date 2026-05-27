@@ -1,10 +1,9 @@
 """
-ETL Pipeline — Orchestrator
+ETL Pipeline Orchestrator
 -----------------------------
-Coordinates the Extract → Transform → Load sequence.
+Coordinates the Extract -> Transform -> Load sequence.
 Produces a structured result dict suitable for logging and API responses.
 
-NFR 1.1 — execute ETL processes efficiently
 """
 import time
 import logging

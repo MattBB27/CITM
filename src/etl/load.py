@@ -1,5 +1,5 @@
 """
-ETL — Load Phase
+ETL Load Phase
 -----------------
 Optimised Synapse loading layer.
 

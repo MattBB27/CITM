@@ -1,5 +1,5 @@
 """
-CITM Test Suite
+CITM Tests
 ---------------
 Tests for ETL extract, transform, and load phases.
 Run:  python -m pytest tests/ -v

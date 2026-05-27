@@ -5,9 +5,6 @@ DB_DIR = os.path.join(BASE_DIR, "db")
 os.makedirs(DB_DIR, exist_ok=True)
 
 # ── Database Connection Strings ──────────────────────────────────────────────
-# In production these would point to Azure SQL (operational) and
-# Azure Synapse Analytics (warehouse). SQLite is used locally for demonstration.
-
 OPERATIONAL_DB_URL = os.getenv("OPERATIONAL_DB_URL")
 WAREHOUSE_DB_URL = os.getenv("WAREHOUSE_DB_URL")
 

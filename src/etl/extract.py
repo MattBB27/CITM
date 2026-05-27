@@ -2,10 +2,9 @@
 ETL — Extract Phase
 --------------------
 Pulls raw data from the operational (OLTP) database using SQLAlchemy + pandas.
-In production, this would query Azure SQL Database via pyodbc or SQLAlchemy's
-Azure SQL dialect.
+Queries Azure SQL Database via pyodbc or SQLAlchemy's Azure SQL dialect.
 
-FR 4.1 — extract operational data using Python and SQLAlchemy
+
 """
 import logging
 import pandas as pd

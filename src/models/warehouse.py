@@ -1,7 +1,7 @@
 """
-Data Warehouse Models — Star Schema (CITM Data Warehouse)
+Data Warehouse Models - Star Schema (CITM Data Warehouse)
 ----------------------------------------------------------
-Implements the dimensional model specified in the CITM design document.
+Implements the dimensional model from the CITM design document.
 Resides in Azure Synapse Analytics (Dedicated SQL Pool).
 
 Note: Synapse does not support enforced UNIQUE or FOREIGN KEY constraints.
@@ -82,7 +82,7 @@ class FactLoanTransaction(Base):
 
     loan_fact_key      = Column(Integer, primary_key=True, autoincrement=True)
 
-    # Keys (no FK constraints — Synapse Dedicated Pool limitation)
+    # Keys (no FK constraints - Synapse Dedicated Pool limitation)
     customer_key       = Column(Integer)
     vehicle_key        = Column(Integer)
     loan_date_key      = Column(Integer)

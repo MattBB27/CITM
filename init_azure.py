@@ -4,8 +4,8 @@ init_azure.py
 Creates tables in both Azure databases using Synapse-compatible DDL.
 
 Synapse Dedicated SQL Pools do NOT support:
-  - Enforced UNIQUE constraints  → use UNIQUE NOT ENFORCED
-  - Enforced FOREIGN KEY constraints → use NOT ENFORCED
+  - Enforced UNIQUE constraints  -> use UNIQUE NOT ENFORCED
+  - Enforced FOREIGN KEY constraints -> use NOT ENFORCED
   - Standard IDENTITY syntax differs slightly
 
 Run once:  python init_azure.py
@@ -16,7 +16,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from sqlalchemy import create_engine, text
 import config
 
-# ── Operational DB DDL (Azure SQL — standard T-SQL) ───────────────────────────
+# ── Operational DB DDL (Azure SQL: standard T-SQL) ───────────────────────────
 OPERATIONAL_DDL = [
     """
     IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='customers' AND xtype='U')

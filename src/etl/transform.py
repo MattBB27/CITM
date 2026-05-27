@@ -1,10 +1,9 @@
 """
-ETL — Transform Phase
+ETL Transform Phase
 ----------------------
 Cleans, structures, and enriches raw operational data into the dimensional model.
 Uses pandas for in-memory transformation.
 
-FR 4.2 — transform extracted data into structured formats using Python
 """
 import logging
 import pandas as pd
@@ -90,10 +89,10 @@ def transform_fact_loans(
 
     Parameters
     ----------
-    *_map       : business_key → surrogate_key dictionaries built after loading dims
+    *_map           : business_key -> surrogate_key dictionaries built after loading dims
     loaded_loan_ids : loan_ids already present in the warehouse (incremental load)
     """
-    # Incremental filter — only process new records
+    # Incremental filter - only process new records
     df = loans_df[~loans_df["loan_id"].isin(loaded_loan_ids)].copy()
 
     if df.empty:
@@ -115,7 +114,7 @@ def transform_fact_loans(
 
     # Select final columns
     fact = df[[
-        "loan_id",          # → source_loan_id (degenerate dim)
+        "loan_id",          # -> source_loan_id (degenerate dim)
         "customer_key",
         "vehicle_key",
         "loan_date_key",

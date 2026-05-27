@@ -4,12 +4,12 @@ CITM Flask Application
 Provides the web interface for the Car Rental Inventory Management System.
 Exposes:
   /               — Dashboard (KPIs from operational DB)
-  /customers      — Customer management (FR 1.1, FR 1.2)
-  /vehicles       — Vehicle management (FR 2.1, FR 2.2)
-  /loans          — Loan transaction management (FR 3.1 – FR 3.4)
+  /customers      — Customer management 
+  /vehicles       — Vehicle management
+  /loans          — Loan transaction management 
   /branches       — Branch listing
   /etl            — ETL control panel + run history
-  /analytics      — Warehouse analytics queries (FR 5.2)
+  /analytics      — Warehouse analytics queries 
 """
 import json
 from datetime import date, datetime, timedelta
@@ -27,9 +27,8 @@ from src.models.warehouse import (
 from src.etl.pipeline import run_etl
 
 # ── Engine / Session setup ────────────────────────────────────────────────────
-# ── Engine / Session setup ────────────────────────────────────────────────────
-# pool_pre_ping=True — drops stale Azure connections that time out after inactivity
-# pool_recycle=1800  — recycle connections every 30 min (Azure closes idle at ~30min)
+# pool_pre_ping=True - drops stale Azure connections that time out after inactivity
+# pool_recycle=1800  - recycle connections every 30 min (Azure closes idle at ~30min)
 op_engine = create_engine(
     config.OPERATIONAL_DB_URL,
     connect_args={"check_same_thread": False} if "sqlite" in config.OPERATIONAL_DB_URL else {},
@@ -92,7 +91,7 @@ def create_app() -> Flask:
         )
         db.close()
 
-        # Warehouse fact count — cached briefly to avoid Synapse round-trip on every load.
+        # Warehouse fact count - cached briefly to avoid Synapse round-trip on every load.
         # Invalidated automatically when ETL runs.
         now = datetime.now()
         if _wh_cache["count"] is None or now > _wh_cache["expires"]:

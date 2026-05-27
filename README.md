@@ -92,17 +92,17 @@ The full data dictionary and ERD are in the [Assignment 1 design report](./Assig
 ### Synapse-specific adaptations
 Azure Synapse Dedicated SQL Pool is not a drop-in for SQL Server. The implementation handles each quirk explicitly:
 
-- **No enforced UNIQUE / FOREIGN KEY constraints** — DDL uses `NOT ENFORCED`; SQLAlchemy relationships use explicit `primaryjoin` expressions instead of FK metadata
-- **No multi-row `VALUES (?,?),(?,?)` INSERTs** — replaced with the `INSERT...SELECT ... UNION ALL` pattern Synapse prefers for small batches
-- **No transactions for DDL** — engine configured with `isolation_level="AUTOCOMMIT"`
-- **Hash distribution incompatible with IDENTITY** — `fact_loan_transaction` distributes on `source_loan_id`
-- **Read-after-write propagation lag in MPP** — handled with retry-with-backoff after upserts
+- **No enforced UNIQUE / FOREIGN KEY constraints**: DDL uses `NOT ENFORCED`; SQLAlchemy relationships use explicit `primaryjoin` expressions instead of FK metadata
+- **No multi-row `VALUES (?,?),(?,?)` INSERTs**: replaced with the `INSERT...SELECT ... UNION ALL` pattern Synapse prefers for small batches
+- **No transactions for DDL**: engine configured with `isolation_level="AUTOCOMMIT"`
+- **Hash distribution incompatible with IDENTITY**: `fact_loan_transaction` distributes on `source_loan_id`
+- **Read-after-write propagation lag in MPP**: handled with retry-with-backoff after upserts
 
 ### Incremental ETL
-The fact load is incremental by design — repeat runs only insert new transactions, gated by the `source_loan_id` degenerate dimension. Dimensions use an upsert pattern with read-back to resolve surrogate keys.
+The fact load is incremental by design; repeat runs only insert new transactions, gated by the `source_loan_id` degenerate dimension. Dimensions use an upsert pattern with read-back to resolve surrogate keys.
 
 ### Computed business logic
-- **Vehicle availability** is *computed*, not stored — a vehicle is "On Loan" if today's date falls between any of its loans' `loan_date` and `return_date`. No manual toggle, no stale flags.
+- **Vehicle availability** is *computed*, not stored - a vehicle is "On Loan" if today's date falls between any of its loans' `loan_date` and `return_date`. No manual toggle, no stale flags.
 - **Date dimension** is built from observed loan/return dates, with `day`, `month`, `year`, `quarter`, `day_of_week`, and `month_name` derived in pandas before load.
 
 ---
@@ -113,8 +113,8 @@ The fact load is incremental by design — repeat runs only insert new transacti
 - Python 3.11+
 - Azure SQL Database (`citm-db`) provisioned on an Azure SQL Server
 - Azure Synapse Dedicated SQL Pool (`citmwarehouse`) on a Synapse Workspace
-- **ODBC Driver 18 for SQL Server** — [download here](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
-- Power BI Desktop (optional — for the external dashboard)
+- **ODBC Driver 18 for SQL Server** - [download here](https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server)
+- Power BI Desktop (optional; for the external dashboard)
 
 ### 1. Install dependencies
 ```bash
@@ -157,7 +157,7 @@ python run_etl.py
 Subsequent runs are incremental — only new records are loaded.
 
 ### 6. (Optional) Open the Power BI dashboard
-Open `citm-analytics.pbix` in Power BI Desktop → **Home → Refresh** to pull the latest data from Synapse.
+Open `citm-analytics.pbix` in Power BI Desktop -> **Home -> Refresh** to pull the latest data from Synapse.
 
 ### 7. Run tests
 ```bash
@@ -183,15 +183,16 @@ citm/
 │   │   ├── operational.py    # OLTP models: Customer, Vehicle, Branch, LoanTransaction
 │   │   └── warehouse.py      # Star schema: FactLoanTransaction + 4 Dim tables
 │   └── etl/
-│       ├── extract.py        # Phase 1 — pandas.read_sql against Azure SQL
-│       ├── transform.py      # Phase 2 — dedupe, type coerce, surrogate keys
-│       ├── load.py           # Phase 3 — INSERT...UNION ALL into Synapse
-│       └── pipeline.py       # Orchestrator — returns timing + row counts
+│       ├── extract.py        # Phase 1 - pandas.read_sql against Azure SQL
+│       ├── transform.py      # Phase 2 - dedupe, type coerce, surrogate keys
+│       ├── load.py           # Phase 3 - INSERT...UNION ALL into Synapse
+│       └── pipeline.py       # Orchestrator - returns timing + row counts
 │
 ├── templates/                # Jinja2 HTML (dark theme)
 │   ├── base.html             # Sidebar nav + global styling
 │   ├── dashboard.html        # Operational KPIs + warehouse status
-│   ├── customers.html / customer_form.html
+│   ├── customers.html 
+│   ├── customer_form.html
 │   ├── vehicles.html         # Computed availability + active loan info
 │   ├── vehicle_form.html
 │   ├── loans.html            # Hybrid filter UI (search + branch + type + date range)
@@ -242,12 +243,12 @@ Connects to Azure SQL via SQLAlchemy. Reads the four operational tables into pan
 | **Analytics** | 5 headline KPIs + annual revenue + 5 cross-tab reports + monthly trend; 5-min cache, auto-invalidates after ETL              |
 
 Analytics report set:
-- **Headline KPIs** — total revenue, total rentals, average fee, average duration, average distance
-- **Annual Revenue** — year-by-year breakdown
-- **Revenue by Branch** — total loans, revenue, average fee per branch
-- **Vehicle Type Performance** — rentals, average duration, revenue per type
-- **Top Customers by Spend** — TOP 10 with rentals and total spent
-- **Monthly Revenue Trend** — month-by-month bar chart
+- **Headline KPIs**: total revenue, total rentals, average fee, average duration, average distance
+- **Annual Revenue**: year-by-year breakdown
+- **Revenue by Branch**: total loans, revenue, average fee per branch
+- **Vehicle Type Performance**: rentals, average duration, revenue per type
+- **Top Customers by Spend**: TOP 10 with rentals and total spent
+- **Monthly Revenue Trend**: month-by-month bar chart
 
 ---
 
@@ -282,16 +283,16 @@ python -m pytest tests/ -v
 
 ## Deployment scope
 
-The data layer is fully cloud-hosted on Azure — the Azure SQL Database and Azure Synapse Dedicated SQL Pool are real, provisioned resources accessed through standard connection strings, not local emulators or stubs. The ETL pipeline performs genuine cross-cloud reads from Azure SQL into pandas DataFrames and writes back to Synapse over ODBC.
+The data layer is fully cloud-hosted on Azure. The Azure SQL Database and Azure Synapse Dedicated SQL Pool are provisioned resources accessed through standard connection strings. The ETL pipeline performs cross-cloud reads from Azure SQL into pandas DataFrames and writes back to Synapse over ODBC.
 
-The Flask application and ETL pipeline themselves run on the developer's machine for the scope of this project. A production deployment of the same code would containerise the app to Azure Container Apps (or App Service) and orchestrate the ETL on a schedule via Azure Data Factory or Azure Functions — no code changes to the ETL or data models would be required.
+The Flask application and ETL pipeline themselves run on the developer's machine for the scope of this project. A production deployment of the same code would containerise the app to Azure Container Apps (or App Service) and orchestrate the ETL on a schedule via Azure Data Factory or Azure Functions - no code changes to the ETL or data models would be required.
 
 ## Known limitations & future extensions
 
-- **No authentication / RBAC** — out of scope for the data-architecture focus of this assignment. A production extension would use Azure AD for SSO and Synapse Row-Level Security for branch-scoped data access.
-- **No vehicle home-branch** — vehicles aren't tied to a specific branch; in production each vehicle would have a `branch_id` foreign key for fleet allocation analytics.
-- **Single-region database deployment** — the Azure resources sit in one region; geo-replication and DR would be added for production resilience.
-- **Manual ETL trigger** — production would orchestrate via Azure Data Factory on a schedule rather than from the web UI or CLI.
+- **No authentication / RBAC**: out of scope for the data-architecture focus of this assignment. A production extension would use Azure AD for SSO and Synapse Row-Level Security for branch-scoped data access.
+- **No vehicle home-branch**: vehicles aren't tied to a specific branch; in production each vehicle would have a `branch_id` foreign key for fleet allocation analytics.
+- **Single-region database deployment**: the Azure resources sit in one region; geo-replication and DR would be added for production resilience.
+- **Manual ETL trigger**: production would orchestrate via Azure Data Factory on a schedule rather than from the web UI or CLI.
 
 ---
 
